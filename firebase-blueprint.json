@@ -1,0 +1,341 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Private authenticated user profile and family membership pointer.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "familyId": { "type": "string" },
+        "relationship": { "type": "string" },
+        "phone": { "type": "string" },
+        "showPhone": { "type": "boolean" },
+        "birthday": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "email", "familyId", "createdAt", "updatedAt"]
+    },
+    "Family": {
+      "title": "Family",
+      "description": "Root family workspace with admin UID, invite code, and member UID list.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "slogan": { "type": "string" },
+        "adminUid": { "type": "string" },
+        "inviteCode": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "slogan", "adminUid", "inviteCode", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FamilyInvite": {
+      "title": "FamilyInvite",
+      "description": "Invite code lookup entry pointing to a family.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "familyName": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "familyName", "createdBy", "active", "createdAt", "updatedAt"]
+    },
+    "FamilyMember": {
+      "title": "FamilyMember",
+      "description": "Family member directory entry with role and privacy preferences.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "familyId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "relationship": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "member"] },
+        "isFundManager": { "type": "boolean" },
+        "phone": { "type": "string" },
+        "showPhone": { "type": "boolean" },
+        "birthday": { "type": "string" },
+        "avatarColorIndex": { "type": "integer" },
+        "locationSharingEnabled": { "type": "boolean" },
+        "lastLat": { "type": "number" },
+        "lastLng": { "type": "number" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "familyId", "displayName", "relationship", "role", "fundManager", "showPhone", "avatarColorIndex", "locationSharingEnabled", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FamilyGroup": {
+      "title": "FamilyGroup",
+      "description": "Family chat group managed exclusively by family admins.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "lastMessageText": { "type": "string" },
+        "lastMessageSender": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "name", "description", "category", "createdBy", "memberUids", "createdAt", "updatedAt"]
+    },
+    "PrivateChat": {
+      "title": "PrivateChat",
+      "description": "1-on-1 private family chat room.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "participantNames": { "type": "array" },
+        "memberUids": { "type": "array" },
+        "lastMessageText": { "type": "string" },
+        "lastMessageSender": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "participantNames", "memberUids", "createdAt", "updatedAt"]
+    },
+    "ChatMessage": {
+      "title": "ChatMessage",
+      "description": "Chat message in either a private chat or a family group.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "roomId": { "type": "string" },
+        "roomType": { "type": "string", "enum": ["private", "group"] },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "text": { "type": "string" },
+        "messageType": { "type": "string", "enum": ["text", "image", "video", "document", "voice", "sticker"] },
+        "mediaLabel": { "type": "string" },
+        "replyToText": { "type": "string" },
+        "replyToSender": { "type": "string" },
+        "forwarded": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["sent", "delivered", "read"] },
+        "readByUids": { "type": "array" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "roomId", "roomType", "senderId", "senderName", "text", "messageType", "forwarded", "status", "readByUids", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FamilyMoment": {
+      "title": "FamilyMoment",
+      "description": "Family status update or photo/video moment.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRoleLabel": { "type": "string" },
+        "caption": { "type": "string" },
+        "momentType": { "type": "string", "enum": ["text", "photo", "video"] },
+        "mediaLabel": { "type": "string" },
+        "likedByUids": { "type": "array" },
+        "commentCount": { "type": "integer" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "authorId", "authorName", "caption", "momentType", "likedByUids", "commentCount", "memberUids", "createdAt", "updatedAt"]
+    },
+    "MomentComment": {
+      "title": "MomentComment",
+      "description": "Comment on a family moment.",
+      "type": "object",
+      "properties": {
+        "momentId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "text": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["momentId", "authorId", "authorName", "text", "memberUids", "createdAt"]
+    },
+    "FamilyCall": {
+      "title": "FamilyCall",
+      "description": "Voice, video, or group call signaling room and history record.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "callerId": { "type": "string" },
+        "callerName": { "type": "string" },
+        "callType": { "type": "string", "enum": ["voice", "video", "group"] },
+        "targetName": { "type": "string" },
+        "status": { "type": "string", "enum": ["ringing", "active", "ended", "missed"] },
+        "participantUids": { "type": "array" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "callerId", "callerName", "callType", "targetName", "status", "participantUids", "memberUids", "createdAt", "updatedAt"]
+    },
+    "TreeNode": {
+      "title": "TreeNode",
+      "description": "Interactive family tree person node.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "fullName": { "type": "string" },
+        "relationTitle": { "type": "string" },
+        "generation": { "type": "integer" },
+        "parentName": { "type": "string" },
+        "spouseName": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "fullName", "relationTitle", "generation", "createdBy", "memberUids", "createdAt", "updatedAt"]
+    },
+    "CalendarEvent": {
+      "title": "CalendarEvent",
+      "description": "Family birthday, wedding, gathering, or reminder event.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["birthday", "wedding", "gathering", "reminder"] },
+        "eventDate": { "type": "string" },
+        "description": { "type": "string" },
+        "reminderEnabled": { "type": "boolean" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "title", "category", "eventDate", "reminderEnabled", "createdBy", "memberUids", "createdAt", "updatedAt"]
+    },
+    "GalleryAlbum": {
+      "title": "GalleryAlbum",
+      "description": "Family photo and video album grouped by event and year with access level.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "title": { "type": "string" },
+        "eventName": { "type": "string" },
+        "year": { "type": "integer" },
+        "mediaType": { "type": "string", "enum": ["photo", "video", "mixed"] },
+        "accessLevel": { "type": "string", "enum": ["all_family", "adults_only", "admin_only"] },
+        "itemLabels": { "type": "array" },
+        "createdBy": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "title", "eventName", "year", "mediaType", "accessLevel", "itemLabels", "createdBy", "memberUids", "createdAt", "updatedAt"]
+    },
+    "FundTransaction": {
+      "title": "FundTransaction",
+      "description": "Family fund income or expense ledger entry managed by admins or fund managers.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "title": { "type": "string" },
+        "txType": { "type": "string", "enum": ["income", "expense"] },
+        "amountRupiah": { "type": "integer" },
+        "category": { "type": "string" },
+        "note": { "type": "string" },
+        "recordedBy": { "type": "string" },
+        "recordedByName": { "type": "string" },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "title", "txType", "amountRupiah", "category", "recordedBy", "recordedByName", "memberUids", "createdAt", "updatedAt"]
+    },
+    "SafetyAlert": {
+      "title": "SafetyAlert",
+      "description": "Family emergency SOS alert or opt-in location check-in.",
+      "type": "object",
+      "properties": {
+        "familyId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "senderName": { "type": "string" },
+        "alertType": { "type": "string", "enum": ["sos", "checkin", "location"] },
+        "message": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "locationConsented": { "type": "boolean" },
+        "status": { "type": "string", "enum": ["active", "resolved"] },
+        "memberUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["familyId", "senderId", "senderName", "alertType", "message", "locationConsented", "status", "memberUids", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Private user profile and account recovery info."
+    },
+    "/family_invites/{inviteCode}": {
+      "schema": { "$ref": "#/entities/FamilyInvite" },
+      "description": "Invite code mapping to familyId."
+    },
+    "/families/{familyId}": {
+      "schema": { "$ref": "#/entities/Family" },
+      "description": "Family root metadata."
+    },
+    "/families/{familyId}/members/{memberId}": {
+      "schema": { "$ref": "#/entities/FamilyMember" },
+      "description": "Family members and RBAC roles."
+    },
+    "/families/{familyId}/groups/{groupId}": {
+      "schema": { "$ref": "#/entities/FamilyGroup" },
+      "description": "Admin-managed family chat groups."
+    },
+    "/families/{familyId}/chats/{chatId}": {
+      "schema": { "$ref": "#/entities/PrivateChat" },
+      "description": "1-on-1 private family chats."
+    },
+    "/families/{familyId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/ChatMessage" },
+      "description": "Messages belonging to private chats or groups."
+    },
+    "/families/{familyId}/moments/{momentId}": {
+      "schema": { "$ref": "#/entities/FamilyMoment" },
+      "description": "Family moments feed."
+    },
+    "/families/{familyId}/moments/{momentId}/comments/{commentId}": {
+      "schema": { "$ref": "#/entities/MomentComment" },
+      "description": "Comments on a family moment."
+    },
+    "/families/{familyId}/calls/{callId}": {
+      "schema": { "$ref": "#/entities/FamilyCall" },
+      "description": "Call signaling and logs."
+    },
+    "/families/{familyId}/tree_nodes/{nodeId}": {
+      "schema": { "$ref": "#/entities/TreeNode" },
+      "description": "Family tree nodes."
+    },
+    "/families/{familyId}/calendar_events/{eventId}": {
+      "schema": { "$ref": "#/entities/CalendarEvent" },
+      "description": "Family calendar events."
+    },
+    "/families/{familyId}/gallery_albums/{albumId}": {
+      "schema": { "$ref": "#/entities/GalleryAlbum" },
+      "description": "Family gallery albums."
+    },
+    "/families/{familyId}/fund_transactions/{txId}": {
+      "schema": { "$ref": "#/entities/FundTransaction" },
+      "description": "Family treasury ledger entries."
+    },
+    "/families/{familyId}/safety_alerts/{alertId}": {
+      "schema": { "$ref": "#/entities/SafetyAlert" },
+      "description": "Emergency SOS alerts and check-ins."
+    }
+  }
+}

@@ -1,0 +1,627 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 1. Primitive Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isPlatformAdmin() {
+      return isSignedIn() &&
+        'email' in request.auth.token &&
+        request.auth.token.email == 'ruliyulianti14@gmail.com' &&
+        'email_verified' in request.auth.token &&
+        request.auth.token.email_verified == true;
+    }
+
+    function isValidUidList(list, minSize, maxSize) {
+      return list is list &&
+        list.size() >= minSize &&
+        list.size() <= maxSize &&
+        (list.size() == 0 || list[0] is string);
+    }
+
+    function isFamilyMember(familyId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid));
+    }
+
+    function isFamilyAdmin(familyId) {
+      return isSignedIn() && (
+        isPlatformAdmin() ||
+        (exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    function isFamilyFundManager(familyId) {
+      return isSignedIn() && (
+        isFamilyAdmin(familyId) ||
+        (exists(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)) &&
+         get(/databases/$(database)/documents/families/$(familyId)/members/$(request.auth.uid)).data.fundManager == true)
+      );
+    }
+
+    // 2. Entity Validation Helpers
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.email is string && data.email.size() <= 150 &&
+        data.familyId is string && data.familyId.size() <= 128 &&
+        (!('relationship' in data) || (data.relationship is string && data.relationship.size() <= 40)) &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+        (!('showPhone' in data) || data.showPhone is bool) &&
+        (!('birthday' in data) || (data.birthday is string && data.birthday.size() <= 30)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidFamily(data) {
+      return data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.slogan is string && data.slogan.size() <= 160 &&
+        data.adminUid is string && data.adminUid.size() >= 1 && data.adminUid.size() <= 128 &&
+        data.inviteCode is string && data.inviteCode.size() >= 4 && data.inviteCode.size() <= 20 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidInvite(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.familyName is string && data.familyName.size() >= 2 && data.familyName.size() <= 80 &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        data.active is bool &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMember(data) {
+      return data.userId is string && data.userId.size() >= 1 && data.userId.size() <= 128 &&
+        data.familyId is string && isValidId(data.familyId) &&
+        data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 80 &&
+        data.relationship is string && data.relationship.size() >= 1 && data.relationship.size() <= 40 &&
+        data.role in ['admin', 'member'] &&
+        data.fundManager is bool &&
+        (!('phone' in data) || (data.phone is string && data.phone.size() <= 30)) &&
+        data.showPhone is bool &&
+        (!('birthday' in data) || (data.birthday is string && data.birthday.size() <= 30)) &&
+        data.avatarColorIndex is int && data.avatarColorIndex >= 0 && data.avatarColorIndex <= 20 &&
+        data.locationSharingEnabled is bool &&
+        (!('lastLat' in data) || data.lastLat is number) &&
+        (!('lastLng' in data) || data.lastLng is number) &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidGroup(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.description is string && data.description.size() <= 300 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 40 &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        (!('lastMessageText' in data) || (data.lastMessageText is string && data.lastMessageText.size() <= 500)) &&
+        (!('lastMessageSender' in data) || (data.lastMessageSender is string && data.lastMessageSender.size() <= 80)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidPrivateChat(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        isValidUidList(data.participantNames, 1, 4) &&
+        isValidUidList(data.memberUids, 1, 2) &&
+        (!('lastMessageText' in data) || (data.lastMessageText is string && data.lastMessageText.size() <= 500)) &&
+        (!('lastMessageSender' in data) || (data.lastMessageSender is string && data.lastMessageSender.size() <= 80)) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMessage(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.roomId is string && isValidId(data.roomId) &&
+        data.roomType in ['private', 'group'] &&
+        data.senderId is string && data.senderId.size() >= 1 && data.senderId.size() <= 128 &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        data.text is string && data.text.size() <= 2000 &&
+        data.messageType in ['text', 'image', 'video', 'document', 'voice', 'sticker'] &&
+        (!('mediaLabel' in data) || (data.mediaLabel is string && data.mediaLabel.size() <= 300)) &&
+        (!('replyToText' in data) || (data.replyToText is string && data.replyToText.size() <= 300)) &&
+        (!('replyToSender' in data) || (data.replyToSender is string && data.replyToSender.size() <= 80)) &&
+        data.forwarded is bool &&
+        data.status in ['sent', 'delivered', 'read'] &&
+        isValidUidList(data.readByUids, 0, 50) &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMoment(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        (!('authorRoleLabel' in data) || (data.authorRoleLabel is string && data.authorRoleLabel.size() <= 40)) &&
+        data.caption is string && data.caption.size() >= 1 && data.caption.size() <= 1000 &&
+        data.momentType in ['text', 'photo', 'video'] &&
+        (!('mediaLabel' in data) || (data.mediaLabel is string && data.mediaLabel.size() <= 300)) &&
+        isValidUidList(data.likedByUids, 0, 50) &&
+        data.commentCount is int && data.commentCount >= 0 && data.commentCount <= 10000 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidMomentComment(data) {
+      return data.momentId is string && isValidId(data.momentId) &&
+        data.authorId is string && data.authorId.size() >= 1 && data.authorId.size() <= 128 &&
+        data.authorName is string && data.authorName.size() >= 1 && data.authorName.size() <= 80 &&
+        data.text is string && data.text.size() >= 1 && data.text.size() <= 500 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time;
+    }
+
+    function isValidCall(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.callerId is string && data.callerId.size() >= 1 && data.callerId.size() <= 128 &&
+        data.callerName is string && data.callerName.size() >= 1 && data.callerName.size() <= 80 &&
+        data.callType in ['voice', 'video', 'group'] &&
+        data.targetName is string && data.targetName.size() >= 1 && data.targetName.size() <= 100 &&
+        data.status in ['ringing', 'active', 'ended', 'missed'] &&
+        isValidUidList(data.participantUids, 1, 50) &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidTreeNode(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.fullName is string && data.fullName.size() >= 1 && data.fullName.size() <= 80 &&
+        data.relationTitle is string && data.relationTitle.size() >= 1 && data.relationTitle.size() <= 40 &&
+        data.generation is int && data.generation >= 1 && data.generation <= 5 &&
+        (!('parentName' in data) || (data.parentName is string && data.parentName.size() <= 80)) &&
+        (!('spouseName' in data) || (data.spouseName is string && data.spouseName.size() <= 80)) &&
+        (!('notes' in data) || (data.notes is string && data.notes.size() <= 200)) &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidCalendarEvent(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+        data.category in ['birthday', 'wedding', 'gathering', 'reminder'] &&
+        data.eventDate is string && data.eventDate.size() >= 4 && data.eventDate.size() <= 30 &&
+        (!('description' in data) || (data.description is string && data.description.size() <= 300)) &&
+        data.reminderEnabled is bool &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidGalleryAlbum(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 100 &&
+        data.eventName is string && data.eventName.size() >= 1 && data.eventName.size() <= 80 &&
+        data.year is int && data.year >= 1950 && data.year <= 2100 &&
+        data.mediaType in ['photo', 'video', 'mixed'] &&
+        data.accessLevel in ['all_family', 'adults_only', 'admin_only'] &&
+        isValidUidList(data.itemLabels, 0, 30) &&
+        data.createdBy is string && data.createdBy.size() >= 1 && data.createdBy.size() <= 128 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidFundTransaction(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.title is string && data.title.size() >= 1 && data.title.size() <= 120 &&
+        data.txType in ['income', 'expense'] &&
+        data.amountRupiah is int && data.amountRupiah > 0 && data.amountRupiah <= 1000000000 &&
+        data.category is string && data.category.size() >= 1 && data.category.size() <= 50 &&
+        (!('note' in data) || (data.note is string && data.note.size() <= 300)) &&
+        data.recordedBy is string && data.recordedBy.size() >= 1 && data.recordedBy.size() <= 128 &&
+        data.recordedByName is string && data.recordedByName.size() >= 1 && data.recordedByName.size() <= 80 &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidSafetyAlert(data) {
+      return data.familyId is string && isValidId(data.familyId) &&
+        data.senderId is string && data.senderId.size() >= 1 && data.senderId.size() <= 128 &&
+        data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 80 &&
+        data.alertType in ['sos', 'checkin', 'location'] &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 400 &&
+        (!('latitude' in data) || data.latitude is number) &&
+        (!('longitude' in data) || data.longitude is number) &&
+        data.locationConsented is bool &&
+        data.status in ['active', 'resolved'] &&
+        isValidUidList(data.memberUids, 1, 50) &&
+        data.createdAt is timestamp && data.createdAt <= request.time &&
+        data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 3. Collection Rules
+
+    // Private User Profiles & Account Recovery Info (Strictly Owner-Only)
+    match /users/{userId} {
+      allow get, list: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        incoming().userId == request.auth.uid &&
+        incoming().keys().hasAll(['userId', 'displayName', 'email', 'familyId', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['userId', 'displayName', 'email', 'familyId', 'relationship', 'phone', 'showPhone', 'birthday', 'createdAt', 'updatedAt']) &&
+        isValidUserProfile(incoming());
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        request.auth.uid == userId &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidUserProfile(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'email', 'familyId', 'relationship', 'phone', 'showPhone', 'birthday', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+    }
+
+    // Invite Codes (Get by exact code only, never list; Admin-managed)
+    match /family_invites/{inviteCode} {
+      allow get: if isSignedIn() && isValidId(inviteCode);
+      allow list: if false;
+      allow create: if isSignedIn() &&
+        isValidId(inviteCode) &&
+        isValidInvite(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().keys().hasAll(['familyId', 'familyName', 'createdBy', 'active', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['familyId', 'familyName', 'createdBy', 'active', 'createdAt', 'updatedAt']) &&
+        (isFamilyAdmin(incoming().familyId) ||
+         getAfter(/databases/$(database)/documents/families/$(incoming().familyId)).data.adminUid == request.auth.uid);
+      allow update: if isSignedIn() &&
+        isValidId(inviteCode) &&
+        isValidInvite(incoming()) &&
+        incoming().familyId == existing().familyId &&
+        incoming().createdAt == existing().createdAt &&
+        isFamilyAdmin(existing().familyId) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['familyName', 'active', 'updatedAt']);
+      allow delete: if isSignedIn() && isValidId(inviteCode) && isFamilyAdmin(existing().familyId);
+    }
+
+    // Families Root Collection
+    match /families/{familyId} {
+      allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+      allow get: if isSignedIn() && isValidId(familyId) && (request.auth.uid in resource.data.memberUids || isPlatformAdmin());
+      allow create: if isSignedIn() &&
+        isValidId(familyId) &&
+        isValidFamily(incoming()) &&
+        incoming().adminUid == request.auth.uid &&
+        request.auth.uid in incoming().memberUids &&
+        incoming().keys().hasAll(['name', 'slogan', 'adminUid', 'inviteCode', 'memberUids', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['name', 'slogan', 'adminUid', 'inviteCode', 'memberUids', 'createdAt', 'updatedAt']);
+      allow update: if isSignedIn() &&
+        isValidId(familyId) &&
+        isValidFamily(incoming()) &&
+        incoming().adminUid == existing().adminUid &&
+        incoming().createdAt == existing().createdAt &&
+        (
+          (isFamilyAdmin(familyId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'slogan', 'inviteCode', 'memberUids', 'updatedAt'])) ||
+          (
+            // Self-join via valid invite code: can ONLY add self to memberUids
+            exists(/databases/$(database)/documents/family_invites/$(existing().inviteCode)) &&
+            get(/databases/$(database)/documents/family_invites/$(existing().inviteCode)).data.active == true &&
+            get(/databases/$(database)/documents/family_invites/$(existing().inviteCode)).data.familyId == familyId &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['memberUids', 'updatedAt']) &&
+            incoming().memberUids.hasAll(existing().memberUids) &&
+            request.auth.uid in incoming().memberUids &&
+            incoming().memberUids.size() <= existing().memberUids.size() + 1
+          )
+        );
+      allow delete: if isSignedIn() && isValidId(familyId) && isFamilyAdmin(familyId);
+
+      // Family Members Subcollection (Strict Role & Self-Promotion Protection)
+      match /members/{memberId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(memberId) && (request.auth.uid in resource.data.memberUids || isFamilyMember(familyId));
+        allow create: if isSignedIn() &&
+          isValidId(memberId) &&
+          isValidMember(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().keys().hasAll(['userId', 'familyId', 'displayName', 'relationship', 'role', 'fundManager', 'showPhone', 'avatarColorIndex', 'locationSharingEnabled', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['userId', 'familyId', 'displayName', 'relationship', 'role', 'fundManager', 'phone', 'showPhone', 'birthday', 'avatarColorIndex', 'locationSharingEnabled', 'lastLat', 'lastLng', 'memberUids', 'createdAt', 'updatedAt']) &&
+          (
+            isFamilyAdmin(familyId) ||
+            (
+              request.auth.uid == memberId &&
+              incoming().userId == request.auth.uid &&
+              (
+                (getAfter(/databases/$(database)/documents/families/$(familyId)).data.adminUid == request.auth.uid && incoming().role == 'admin') ||
+                (incoming().role == 'member' && incoming().fundManager == false && request.auth.uid in getAfter(/databases/$(database)/documents/families/$(familyId)).data.memberUids)
+              )
+            )
+          );
+        allow update: if isSignedIn() &&
+          isValidId(memberId) &&
+          isValidMember(incoming()) &&
+          incoming().userId == existing().userId &&
+          incoming().familyId == existing().familyId &&
+          incoming().createdAt == existing().createdAt &&
+          (
+            (isFamilyAdmin(familyId) && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'fundManager', 'relationship', 'displayName', 'memberUids', 'updatedAt'])) ||
+            (request.auth.uid == memberId && incoming().role == existing().role && incoming().fundManager == existing().fundManager && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'relationship', 'phone', 'showPhone', 'birthday', 'avatarColorIndex', 'locationSharingEnabled', 'lastLat', 'lastLng', 'memberUids', 'updatedAt']))
+          );
+        allow delete: if isSignedIn() && isValidId(memberId) && isFamilyAdmin(familyId);
+      }
+
+      // Family Groups Subcollection (ADMIN-ONLY Create, Rename, Member Management, Delete!)
+      match /groups/{groupId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(groupId) && (request.auth.uid in resource.data.memberUids || isFamilyAdmin(familyId));
+        allow create: if isSignedIn() &&
+          isValidId(groupId) &&
+          isValidGroup(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().createdBy == request.auth.uid &&
+          incoming().keys().hasAll(['familyId', 'name', 'description', 'category', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'name', 'description', 'category', 'createdBy', 'memberUids', 'lastMessageText', 'lastMessageSender', 'createdAt', 'updatedAt']) &&
+          isFamilyAdmin(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(groupId) &&
+          isValidGroup(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().createdBy == existing().createdBy &&
+          incoming().createdAt == existing().createdAt &&
+          (
+            (isFamilyAdmin(familyId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description', 'category', 'memberUids', 'lastMessageText', 'lastMessageSender', 'updatedAt'])) ||
+            (request.auth.uid in existing().memberUids && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessageText', 'lastMessageSender', 'updatedAt']))
+          );
+        allow delete: if isSignedIn() && isValidId(groupId) && isFamilyAdmin(familyId);
+      }
+
+      // Private 1-on-1 Chats Subcollection
+      match /chats/{chatId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(chatId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(chatId) &&
+          isValidPrivateChat(incoming()) &&
+          incoming().familyId == familyId &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'participantNames', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'participantNames', 'memberUids', 'lastMessageText', 'lastMessageSender', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(chatId) &&
+          isValidPrivateChat(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().createdAt == existing().createdAt &&
+          request.auth.uid in existing().memberUids &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['lastMessageText', 'lastMessageSender', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(chatId) && isFamilyAdmin(familyId);
+      }
+
+      // Chat Messages Subcollection
+      match /messages/{messageId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(messageId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(messageId) &&
+          isValidMessage(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().senderId == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'roomId', 'roomType', 'senderId', 'senderName', 'text', 'messageType', 'forwarded', 'status', 'readByUids', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'roomId', 'roomType', 'senderId', 'senderName', 'text', 'messageType', 'mediaLabel', 'replyToText', 'replyToSender', 'forwarded', 'status', 'readByUids', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(messageId) &&
+          isValidMessage(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().senderId == existing().senderId &&
+          incoming().createdAt == existing().createdAt &&
+          request.auth.uid in existing().memberUids &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'readByUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(messageId) && (existing().senderId == request.auth.uid || isFamilyAdmin(familyId));
+      }
+
+      // Family Moments Subcollection
+      match /moments/{momentId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(momentId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(momentId) &&
+          isValidMoment(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().authorId == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'authorId', 'authorName', 'caption', 'momentType', 'likedByUids', 'commentCount', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'authorId', 'authorName', 'authorRoleLabel', 'caption', 'momentType', 'mediaLabel', 'likedByUids', 'commentCount', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(momentId) &&
+          isValidMoment(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().authorId == existing().authorId &&
+          incoming().createdAt == existing().createdAt &&
+          request.auth.uid in existing().memberUids &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['likedByUids', 'commentCount', 'memberUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(momentId) && (existing().authorId == request.auth.uid || isFamilyAdmin(familyId));
+
+        match /comments/{commentId} {
+          allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+          allow get: if isSignedIn() && isValidId(commentId) && request.auth.uid in resource.data.memberUids;
+          allow create: if isSignedIn() &&
+            isValidId(commentId) &&
+            isValidMomentComment(incoming()) &&
+            incoming().momentId == momentId &&
+            incoming().authorId == request.auth.uid &&
+            request.auth.uid in incoming().memberUids &&
+            incoming().keys().hasAll(['momentId', 'authorId', 'authorName', 'text', 'memberUids', 'createdAt']) &&
+            incoming().keys().hasOnly(['momentId', 'authorId', 'authorName', 'text', 'memberUids', 'createdAt']) &&
+            isFamilyMember(familyId);
+          allow delete: if isSignedIn() && isValidId(commentId) && (existing().authorId == request.auth.uid || isFamilyAdmin(familyId));
+        }
+      }
+
+      // Family Calls Subcollection
+      match /calls/{callId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(callId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(callId) &&
+          isValidCall(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().callerId == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'callerId', 'callerName', 'callType', 'targetName', 'status', 'participantUids', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'callerId', 'callerName', 'callType', 'targetName', 'status', 'participantUids', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(callId) &&
+          isValidCall(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().callerId == existing().callerId &&
+          incoming().createdAt == existing().createdAt &&
+          request.auth.uid in existing().memberUids &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'participantUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(callId) && (existing().callerId == request.auth.uid || isFamilyAdmin(familyId));
+      }
+
+      // Family Tree Nodes Subcollection
+      match /tree_nodes/{nodeId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(nodeId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(nodeId) &&
+          isValidTreeNode(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().createdBy == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'fullName', 'relationTitle', 'generation', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'fullName', 'relationTitle', 'generation', 'parentName', 'spouseName', 'notes', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(nodeId) &&
+          isValidTreeNode(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().createdBy == existing().createdBy &&
+          incoming().createdAt == existing().createdAt &&
+          (isFamilyAdmin(familyId) || existing().createdBy == request.auth.uid) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'relationTitle', 'generation', 'parentName', 'spouseName', 'notes', 'memberUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(nodeId) && (existing().createdBy == request.auth.uid || isFamilyAdmin(familyId));
+      }
+
+      // Family Calendar Events Subcollection
+      match /calendar_events/{eventId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(eventId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(eventId) &&
+          isValidCalendarEvent(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().createdBy == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'title', 'category', 'eventDate', 'reminderEnabled', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'title', 'category', 'eventDate', 'description', 'reminderEnabled', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(eventId) &&
+          isValidCalendarEvent(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().createdBy == existing().createdBy &&
+          incoming().createdAt == existing().createdAt &&
+          (isFamilyAdmin(familyId) || existing().createdBy == request.auth.uid) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'category', 'eventDate', 'description', 'reminderEnabled', 'memberUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(eventId) && (existing().createdBy == request.auth.uid || isFamilyAdmin(familyId));
+      }
+
+      // Family Gallery Albums Subcollection
+      match /gallery_albums/{albumId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(albumId) && request.auth.uid in resource.data.memberUids && (resource.data.accessLevel != 'admin_only' || isFamilyAdmin(familyId));
+        allow create: if isSignedIn() &&
+          isValidId(albumId) &&
+          isValidGalleryAlbum(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().createdBy == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'title', 'eventName', 'year', 'mediaType', 'accessLevel', 'itemLabels', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'title', 'eventName', 'year', 'mediaType', 'accessLevel', 'itemLabels', 'createdBy', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(albumId) &&
+          isValidGalleryAlbum(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().createdBy == existing().createdBy &&
+          incoming().createdAt == existing().createdAt &&
+          (isFamilyAdmin(familyId) || existing().createdBy == request.auth.uid) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'eventName', 'year', 'mediaType', 'accessLevel', 'itemLabels', 'memberUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(albumId) && (existing().createdBy == request.auth.uid || isFamilyAdmin(familyId));
+      }
+
+      // Family Fund Transactions Subcollection (ADMIN OR DESIGNATED FUND MANAGER ONLY FOR WRITES!)
+      match /fund_transactions/{txId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(txId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(txId) &&
+          isValidFundTransaction(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().recordedBy == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'title', 'txType', 'amountRupiah', 'category', 'recordedBy', 'recordedByName', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'title', 'txType', 'amountRupiah', 'category', 'note', 'recordedBy', 'recordedByName', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyFundManager(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(txId) &&
+          isValidFundTransaction(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().recordedBy == existing().recordedBy &&
+          incoming().createdAt == existing().createdAt &&
+          isFamilyFundManager(familyId) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'txType', 'amountRupiah', 'category', 'note', 'memberUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(txId) && isFamilyFundManager(familyId);
+      }
+
+      // Family Safety Alerts Subcollection
+      match /safety_alerts/{alertId} {
+        allow list: if isSignedIn() && request.auth.uid in resource.data.memberUids;
+        allow get: if isSignedIn() && isValidId(alertId) && request.auth.uid in resource.data.memberUids;
+        allow create: if isSignedIn() &&
+          isValidId(alertId) &&
+          isValidSafetyAlert(incoming()) &&
+          incoming().familyId == familyId &&
+          incoming().senderId == request.auth.uid &&
+          request.auth.uid in incoming().memberUids &&
+          incoming().keys().hasAll(['familyId', 'senderId', 'senderName', 'alertType', 'message', 'locationConsented', 'status', 'memberUids', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['familyId', 'senderId', 'senderName', 'alertType', 'message', 'latitude', 'longitude', 'locationConsented', 'status', 'memberUids', 'createdAt', 'updatedAt']) &&
+          isFamilyMember(familyId);
+        allow update: if isSignedIn() &&
+          isValidId(alertId) &&
+          isValidSafetyAlert(incoming()) &&
+          incoming().familyId == existing().familyId &&
+          incoming().senderId == existing().senderId &&
+          incoming().createdAt == existing().createdAt &&
+          (existing().senderId == request.auth.uid || isFamilyAdmin(familyId)) &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['status', 'memberUids', 'updatedAt']);
+        allow delete: if isSignedIn() && isValidId(alertId) && isFamilyAdmin(familyId);
+      }
+    }
+  }
+}
