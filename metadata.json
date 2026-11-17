@@ -1,5 +1,5 @@
 {
-  "name": "My Family Chat",
+  "name": "My Family komunikasi",
   "description": "One Family, One Connection, One Love. Aplikasi komunikasi keluarga modern dengan chat pribadi, grup keluarga, momen, kalender, silsilah, galeri, kas keluarga, dan tombol darurat.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

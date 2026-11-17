@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "My Family Chat"
+rootProject.name = "My Family komunikasi"
 
 include(":app")

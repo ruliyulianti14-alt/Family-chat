@@ -141,12 +141,12 @@ fun SplashScreen(onFinished: () -> Unit) {
             ) {
                 Image(
                     painter = painterResource(id = R.drawable.ic_family_logo),
-                    contentDescription = "Logo My Family Chat",
+                    contentDescription = "Logo My Family komunikasi",
                     contentScale = ContentScale.Crop
                 )
             }
             Text(
-                text = "MY FAMILY CHAT",
+                text = "My Family komunikasi",
                 style = MaterialTheme.typography.displaySmall,
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
@@ -286,7 +286,7 @@ fun LoginScreen(
                                 .padding(18.dp)
                         ) {
                             Text(
-                                text = "MY FAMILY CHAT",
+                                text = "My Family komunikasi",
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold

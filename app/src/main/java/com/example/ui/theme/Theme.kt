@@ -23,7 +23,7 @@ enum class AppThemeOption(
     SKY_WARM(
         id = "sky_warm",
         displayName = "Biru Hangat",
-        subtitle = "Cerah, ramah & warna utama My Family Chat",
+        subtitle = "Cerah, ramah & warna utama My Family komunikasi",
         previewPrimary = SkyBluePrimary,
         previewSecondary = WarmOrange,
         previewTertiary = FamilyMint,

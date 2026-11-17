@@ -137,7 +137,7 @@ fun MembersScreen(
                                 type = "text/plain"
                                 putExtra(
                                     Intent.EXTRA_TEXT,
-                                    "Ayo bergabung di MY FAMILY CHAT ($famName)! Gunakan kode undangan: $code\n\"One Family, One Connection, One Love.\""
+                                    "Ayo bergabung di My Family komunikasi ($famName)! Gunakan kode undangan: $code\n\"One Family, One Connection, One Love.\""
                                 )
                             }
                             context.startActivity(Intent.createChooser(shareIntent, "Bagikan Undangan Keluarga"))

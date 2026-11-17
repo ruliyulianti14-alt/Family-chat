@@ -301,7 +301,7 @@ class LocalRoomFamilyGateway(
                 roomType = "group",
                 senderId = DEMO_ADMIN_UID,
                 senderName = "Ayah Hendra",
-                text = "Selamat datang di MY FAMILY CHAT! Semoga komunikasi keluarga makin hangat.",
+                text = "Selamat datang di My Family komunikasi! Semoga komunikasi keluarga makin hangat.",
                 messageType = "text",
                 mediaLabel = "",
                 replyToText = "",
